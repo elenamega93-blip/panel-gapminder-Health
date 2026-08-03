@@ -7,7 +7,7 @@ format:
     theme: darkly
     nav-buttons:
       - icon: github
-        href: href: https://github.com/elenamega93-blip/panel-gapminder-Health
+        href: https://github.com/elenamega93-blip/panel-gapminder-Health
     logo: ""
 ---
 

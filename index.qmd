@@ -1,0 +1,196 @@
+---
+title: "Panel de Estadísticas Gapminder"
+subtitle: "Cáncer Colorrectal y Esperanza de Vida en Mujeres"
+author: "Mirna Elena Meléndez Gálvez"
+format:
+  dashboard:
+    theme: darkly
+    nav-buttons:
+      - icon: github
+        href: https://github.com/tu-usuario/tu-repo
+    logo: ""
+---
+
+```{python}
+#| echo: false
+#| warning: false
+
+# ============================================
+# CONFIGURACIÓN INICIAL: importar librerías
+# ============================================
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import seaborn as sns
+
+# ============================================
+# CARGA DE DATOS
+# ============================================
+df1 = pd.read_csv("data/colonandrectum_cancer_new_cases_per_100000_women.csv")
+df2 = pd.read_csv("data/life_expectancy_female.csv")
+
+# ============================================
+# TRANSFORMACIÓN: de formato ancho a largo
+# ============================================
+df1_long = df1.melt(id_vars=["geo", "name"], var_name="year", value_name="cancer_colorrectal")
+df1_long["year"] = df1_long["year"].astype(int)
+df1_long = df1_long.dropna()
+df1_long = df1_long[(df1_long["year"] >= 1990) & (df1_long["year"] <= 2023)]
+
+df2_long = df2.melt(id_vars=["geo", "name"], var_name="year", value_name="esperanza_vida")
+df2_long["year"] = df2_long["year"].astype(int)
+df2_long = df2_long.dropna()
+df2_long = df2_long[(df2_long["year"] >= 1990) & (df2_long["year"] <= 2023)]
+
+# ============================================
+# COMBINAR AMBOS INDICADORES (para la página 3)
+# ============================================
+df_merged = pd.merge(df1_long, df2_long, on=["geo", "name", "year"], how="inner")
+
+# Año más reciente disponible, útil para varios elementos
+ultimo_anio = df1_long["year"].max()
+df1_reciente = df1_long[df1_long["year"] == ultimo_anio]
+df2_reciente = df2_long[df2_long["year"] == df2_long["year"].max()]
+```
+
+# Indicador 1
+
+## Row {height="20%"}
+
+```{python}
+#| content: valuebox
+#| title: "Promedio Global (último año)"
+#| icon: activity
+#| color: primary
+dict(value=float(round(df1_reciente["cancer_colorrectal"].mean(), 1)))
+```
+
+```{python}
+#| content: valuebox
+#| title: "País con valor más alto"
+#| icon: arrow-up-circle
+#| color: danger
+dict(value=str(df1_reciente.loc[df1_reciente["cancer_colorrectal"].idxmax(), "name"]))
+```
+
+```{python}
+#| content: valuebox
+#| title: "País con valor más bajo"
+#| icon: arrow-down-circle
+#| color: success
+dict(value=str(df1_reciente.loc[df1_reciente["cancer_colorrectal"].idxmin(), "name"]))
+```
+
+## Row {height="50%"}
+
+### Column {width="60%"}
+
+```{python}
+#| title: "Tendencia del cáncer colorrectal en el tiempo"
+paises_top5 = df1_reciente.nlargest(5, "cancer_colorrectal")["name"].tolist()
+df_top5 = df1_long[df1_long["name"].isin(paises_top5)]
+fig = px.line(df_top5, x="year", y="cancer_colorrectal", color="name",
+              labels={"cancer_colorrectal": "Casos nuevos por 100,000 mujeres", "year": "Año", "name": "País"})
+fig
+```
+
+### Column {width="40%"}
+
+```{python}
+#| title: "Mapa mundial - Cáncer colorrectal"
+fig = px.choropleth(df1_reciente, locations="name", locationmode="country names",
+                     color="cancer_colorrectal", hover_name="name",
+                     color_continuous_scale="Reds",
+                     labels={"cancer_colorrectal": "Casos por 100,000"})
+fig
+```
+
+## Row {height="30%"}
+
+### Column {width="60%"}
+
+```{python}
+#| title: "Top 10 países - Cáncer colorrectal"
+top10 = df1_reciente.sort_values("cancer_colorrectal", ascending=False).head(10)[["name", "cancer_colorrectal"]]
+top10.columns = ["País", "Casos por 100,000 mujeres"]
+top10
+```
+
+### Column {width="40%"}
+
+::: {.card title="Insight clave"}
+Las mayores tasas de cáncer colorrectal en mujeres se registran en países de altos ingresos. Este patrón puede explicarse por una combinación de una mayor cobertura y acceso a los servicios de diagnóstico, junto con la exposición a factores de riesgo asociados con la alimentación, el sedentarismo y otros hábitos de vida.
+:::
+
+# Indicador 2
+
+## Row {height="20%"}
+
+```{python}
+#| content: valuebox
+#| title: "Esperanza de vida promedio (último año)"
+#| icon: heart-pulse
+#| color: primary
+dict(value=float(round(df2_reciente["esperanza_vida"].mean(), 1)))
+```
+
+```{python}
+#| content: valuebox
+#| title: "País con mayor esperanza de vida"
+#| icon: arrow-up-circle
+#| color: success
+dict(value=str(df2_reciente.loc[df2_reciente["esperanza_vida"].idxmax(), "name"]))
+```
+
+## Row {height="50%"}
+
+### Column {width="60%"}
+
+```{python}
+#| title: "Esperanza de vida femenina - Top 10 países"
+top10_vida = df2_reciente.nlargest(10, "esperanza_vida")
+fig = px.bar(top10_vida, x="name", y="esperanza_vida", color="esperanza_vida",
+             labels={"esperanza_vida": "Esperanza de vida (años)", "name": "País"},
+             color_continuous_scale="Blues")
+fig
+```
+
+### Column {width="40%"}
+
+```{python}
+#| title: "Distribución de la esperanza de vida"
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(5, 4))
+sns.histplot(df2_reciente["esperanza_vida"], kde=True, ax=ax, color="steelblue")
+ax.set_xlabel("Esperanza de vida (años)")
+ax.set_ylabel("Número de países")
+plt.tight_layout()
+plt.show()
+```
+
+## Row {height="30%"}
+
+::: {.card title="Insight clave"}
+La distribución evidencia diferencias importantes entre los países, lo que pone de manifiesto las desigualdades existentes en el acceso a los servicios de salud, las condiciones socioeconómicas y la calidad de la atención materno-infantil.
+:::
+
+# Relación entre Indicadores
+
+## Row {height="60%"}
+
+```{python}
+#| title: "Cáncer colorrectal vs Esperanza de vida"
+df_merged_reciente = df_merged[df_merged["year"] == df_merged["year"].max()]
+fig = px.scatter(df_merged_reciente, x="esperanza_vida", y="cancer_colorrectal",
+                  hover_name="name", size="cancer_colorrectal", color="cancer_colorrectal",
+                  labels={"esperanza_vida": "Esperanza de vida (años)",
+                          "cancer_colorrectal": "Casos de cáncer colorrectal por 100,000"},
+                  color_continuous_scale="Viridis")
+fig
+```
+
+## Row {height="40%"}
+
+::: {.card title="¿Qué relación observas?"}
+De manera descriptiva, se puede observar si los países con una mayor esperanza de vida también tienden a presentar tasas más elevadas de cáncer colorrectal. Este patrón podría estar relacionado con el envejecimiento de la población, una mayor exposición acumulada a factores de riesgo a lo largo de la vida y la disponibilidad de sistemas de detección más desarrollados, que facilitan la identificación de un mayor número de casos. No obstante, también es importante identificar aquellos países que no siguen esta tendencia, ya que ello podría reflejar la influencia de otros factores demográficos, ambientales o del sistema de salud.
+:::
